@@ -1,0 +1,12 @@
+(defun my-reverse (lst)
+  (labels ((f (lst)
+			 (cond ((null lst)
+					lst)
+				   (t (nconc (f (cdr lst)) (list (car lst)))))))
+	(f lst)))
+(defun good-reverse (lst)
+  (labels ((rev (lst acc)
+			 (if (null lst)
+				 acc
+				 (rev (cdr lst) (cons (car lst) acc)))))
+	(rev lst nil)))
