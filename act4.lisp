@@ -186,3 +186,73 @@
 				  ((= score max)
 				   (push obj result)))))
 		(values (nreverse result max)))))
+
+
+(defun mapa-b (fn a b &optional (step 1))
+  (do ((i a (+ i step))
+	   (result nil))
+	  ((> i b) (nreverse result))
+	(push (funcall fn i) result)))
+
+(defun map0-n (fn n)
+  (mapa-b fn 0 n))
+
+(defun map1-n (fn n)
+  (mapa-b fn 1 n))
+
+(defun map-> (fn start test-fn succ-fn)
+  (do ((i start (funcall succ-fn i))
+	   (result nil))
+	  ((funcall test-fn i) result)
+	(push (funcall fn i) result)))
+
+(defun mappend (fn &rest lsts)
+  (apply #'append (apply #'mapcar fn lsts)))
+
+(defun mapcars (fn &rest lsts)
+  (let ((result nil))
+	(dolist (lst lsts)
+	  (dolist (obj lst)
+		(push (funcall fn obj) result))
+	  (nreverse result))))
+
+(defun rmapcar (fn &rest args)
+  (if (some #'atom args)
+	  (apply fn args)
+	  (appply #'mapcar
+			  #'(lambda (&rest args)
+				  (apply #'rmapcar fn args))
+			  args)))
+
+(defun readlist (&rest args)
+  (values (read-from-string
+		   (concatenate 'string "("
+						(apply #'read-line args)
+						")"))))
+
+(defun prompt (&rest args)
+  (apply #'format *query-io* args)
+  (read *query-io*))
+
+(defun break-loop (fn quit &rest args)
+  (format *query-io* "Entering break-loop.~%")
+  (loop
+	 (let ((in (apply #'prompt args)))
+	   (if (funcall quit in)
+		   (return)
+		   (format *query-io* "~A~%" (funcall fn in))))))
+
+(defun mkstr (&rest args)
+  (with-output-to-string (s)
+	(dolist (a args)
+	  (princ a s))))
+
+(defun symb (&rest args)
+  (values (read-from-string (apply #'mkstr args))))
+
+(defun explode (sym)
+  (map 'list #'(lambda (c)
+				 (intern (make-string 1
+									  :initial-element c)))
+	   (symbol-name sym)))
+
