@@ -65,3 +65,65 @@
   (if obj
 	  (setq *procs* (apply #'delete obj *procs* args))
 	  (pick-process)))
+
+
+(defvar *open-door* nil)
+
+(=defun pedestrian ()
+  (wait d (car *open-door*)
+		(format t "Entering ~A~%" d)))
+
+(program ped ()
+		 (fork (pedestrian) 1))
+
+(defvar *bboard* nil)
+
+(defun claim (&rest f) (push f *bboard*))
+
+(defun unclaim (&rest f) (pull f *bboard* :test #'equal))
+
+(defun check (&rest f) (find f *bboard* :test #'equal))
+
+(=defun visitor (door)
+  (format t "Approach ~A. " door)
+  (claim 'knock door)
+  (wait d (check 'open door)
+		(format t "Enter ~A.~%" door)
+		(unclaim 'knock door)
+		(claim 'inside door)))
+
+(=defun host (door)
+  (wait k (check 'knock door)
+		(format t "Open ~A. " door)
+		(claim 'open door)
+		(wait g (check 'inside door)
+			  (format t "Close ~A.~%")
+			  (unclaim 'open door))))
+
+(program ballet ()
+		 (fork (visitor 'door1) 1)
+		 (fork (host 'door1) 1)
+		 (fork (visitor 'door2) 1)
+		 (fork (host 'door2) 1))
+
+(=defun capture (city)
+  (take city)
+  (setpri 1)
+  (yield
+   (fortify city)))
+
+(=defun plunder (city)
+  (loot city)
+  (ransom city))
+
+(defun take (c) (format t "Liberationg ~A.~%" c))
+
+(defun fortify (c) (format t "Rebuilding ~A.~%" c))
+
+(defun fortify (c) (format t "Nationalizing ~A.~%" c))
+
+(defun fortify (c) (format t "Refinancing ~A.~%" c))
+
+(program barbarians ()
+		 (fork (capture 'rome) 100)
+		 (fork (plunder 'rome) 98))
