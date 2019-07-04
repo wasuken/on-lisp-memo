@@ -148,3 +148,81 @@
 				  (if ,win
 					  ,(gen-query ant val)
 					  (fail)))))))
+(defun rule-fn (ant con)
+  (with-gensyms (val win fact binds paths)
+	`(=lambda (,fact ,binds ,paths)
+			  (with-gensyms ,(vars-in (list ant con) #'simple?)
+				(multiple-value-bind
+					  (,val ,win)
+					(math ,fact
+						  (list ',(car con)
+								,@(mapcar #'form (cdr con)))
+						  ,binds)
+				  (if ,win
+					  ,(gen-query ant val paths
+								  (fail))))))))
+
+(defmacro with-inference (query &rest body)
+  (let ((vars (vars-in query #'simple?)) (gb (gensym)))
+	`(with-gensyms ,vars
+	   (setq *paths* nil)
+	   (=bind (,gb) ,(gen-query (rep_ query) nil '*paths*)
+			  (let ,(mapcar #'(lambda (v)
+								`(,v (fullbind ,v ,gb)))
+							vars)
+				,@body)
+			  (fail)))))
+
+(defun gen-query (expr binds paths)
+  (case (car expr)
+	(and (gen-and (cdr expr) binds paths))
+	(or (gen-or (cdr expr) binds paths))
+	(not (gen-not (cadr expr) binds paths))
+	(lisp (gen-lisp (cadr expr) binds))
+	(is (gen-is (cadr expr) (third expr) binds))
+	(cut `(progn (setq *paths* ,paths)
+				 (=values ,binds)))
+	(t `(progn (list ',(car expr)
+					 ,@(mapcar #'form (cdr expr)))
+			   ,binds *paths*))))
+
+(=defun prove (query binds paths)
+		(choose-bind r *rules*
+					 (=funcall r query binds paths)))
+
+(defun gen-and (clauses binds paths)
+  (if (null clauses)
+	  `(=values ,binds)
+	  (let ((gb (gensym)))
+		`(=bind (,gb) ,(gen-query (car clauses) binds paths)
+				,(gen-and (cdr clauses) gb paths)))))
+
+(defun gen-or (clauses binds paths)
+  `(choose
+	,@(mapcar #'(lambda (c) (gen-query c binds paths))
+			  clauses)))
+
+(defun gen-not (expr binds paths)
+  (let ((gpaths (gensym)))
+	`(let ((,gpaths *paths*))
+	   (setq *paths* nil)
+	   (choose (=bind (b) ,(gen-query expr binds paths)
+					  (setq *paths* ,gpaths)
+					  (fail))
+			   (progn (setq *paths* ,gpaths)
+					  (=values ,binds))))))
+
+(defmacro with-binds (binds expr)
+  `(let ,(mapcar #'(lambda (v) `(,v (fullbind ,v ,binds)))
+				 (vars-in expr))
+	 ,expr))
+
+(defun gen-lisp (expr binds)
+  `(if (with-binds ,binds ,expr)
+	   (=values ,binds)
+	   (fail)))
+
+(defun gen-is (expr1 expr2 binds)
+  `(aif2 (match ,expr1 (with-binds ,binds ,expr2) ,binds)
+		 (=values it)
+		 (fail)))
